@@ -112,9 +112,11 @@ data
 
 # custom
 *.pkl
-*.pkl.json
-*.log.json
+# *.pkl.json
+# *.log.json
+*.json
 work_dirs/
+data/
 
 # Pytorch
 *.pth
