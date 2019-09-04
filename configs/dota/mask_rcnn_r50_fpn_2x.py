@@ -113,7 +113,7 @@ test_cfg = dict(
         mask_thr_binary=0.5))
 # dataset settings
 dataset_type = 'DOTADataset'
-data_root = '/home/gfjiang/10.193.0.20/data/DOTA/'
+data_root = '/media/gfjiang/865C6A1F5C6A09EF/data/DOTA/'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 train_pipeline = [
@@ -146,19 +146,21 @@ data = dict(
     workers_per_gpu=4,
     train=dict(
         type=dataset_type,
-        ann_file='../data/train_crop800x800_dota_x1y1wh_polygen.json',
+        ann_file='../data/train_dota+crop800x800.json',
         img_prefix=data_root + 'train/images/',
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
-        ann_file='../data/val_crop800x800_dota_x1y1wh_polygen.json',
+        ann_file='../data/dota/val_dota+crop800x800.json',
         img_prefix=data_root + 'val/images/',
-        pipeline=test_pipeline),
+        pipeline=test_pipeline,
+        mode='val'),
     test=dict(
         type=dataset_type,
-        ann_file='../data/val_crop800x800_dota_x1y1wh_polygen.json',
-        img_prefix=data_root + 'val/images/',
-        pipeline=test_pipeline))
+        ann_file='../data/dota/debug_test_dota+crop800x800.json',
+        img_prefix=data_root + 'test/images/',
+        pipeline=test_pipeline,
+        mode='test'))
 # optimizer
 optimizer = dict(type='SGD', lr=0.02, momentum=0.9, weight_decay=0.0001)
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))

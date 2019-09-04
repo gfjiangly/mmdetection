@@ -7,7 +7,7 @@
 - PyTorch 1.1 or higher
 - CUDA 9.0 or higher
 - NCCL 2
-- GCC(G++) 4.9 or higher
+- GCC 4.9 or higher
 - [mmcv](https://github.com/open-mmlab/mmcv)
 
 We have tested the following versions of OS and softwares:

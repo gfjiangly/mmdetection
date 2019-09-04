@@ -1,19 +1,25 @@
 # model settings
+conv_cfg = dict(type='ConvWS')
+norm_cfg = dict(type='GN', num_groups=32, requires_grad=True)
 model = dict(
     type='MaskRCNN',
-    pretrained='torchvision://resnet50',
+    pretrained='open-mmlab://jhu/resnet50_gn_ws',
     backbone=dict(
         type='ResNet',
         depth=50,
         num_stages=4,
         out_indices=(0, 1, 2, 3),
         frozen_stages=1,
-        style='pytorch'),
+        style='pytorch',
+        conv_cfg=conv_cfg,
+        norm_cfg=norm_cfg),
     neck=dict(
         type='FPN',
         in_channels=[256, 512, 1024, 2048],
         out_channels=256,
-        num_outs=5),
+        num_outs=5,
+        conv_cfg=conv_cfg,
+        norm_cfg=norm_cfg),
     rpn_head=dict(
         type='RPNHead',
         in_channels=256,
@@ -32,15 +38,19 @@ model = dict(
         out_channels=256,
         featmap_strides=[4, 8, 16, 32]),
     bbox_head=dict(
-        type='SharedFCBBoxHead',
-        num_fcs=2,
+        type='ConvFCBBoxHead',
+        num_shared_convs=4,
+        num_shared_fcs=1,
         in_channels=256,
+        conv_out_channels=256,
         fc_out_channels=1024,
         roi_feat_size=7,
-        num_classes=15+1,
+        num_classes=81,
         target_means=[0., 0., 0., 0.],
         target_stds=[0.1, 0.1, 0.2, 0.2],
         reg_class_agnostic=False,
+        conv_cfg=conv_cfg,
+        norm_cfg=norm_cfg,
         loss_cls=dict(
             type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
         loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0)),
@@ -54,7 +64,9 @@ model = dict(
         num_convs=4,
         in_channels=256,
         conv_out_channels=256,
-        num_classes=15+1,
+        num_classes=81,
+        conv_cfg=conv_cfg,
+        norm_cfg=norm_cfg,
         loss_mask=dict(
             type='CrossEntropyLoss', use_mask=True, loss_weight=1.0)))
 # model training and testing settings
@@ -119,7 +131,7 @@ img_norm_cfg = dict(
 train_pipeline = [
     dict(type='DOTALoadImageFromFile'),
     dict(type='DOTALoadAnnotations', with_bbox=True, with_mask=True),
-    dict(type='Resize', img_scale=[(1333, 800), (1333, 448)], multiscale_mode='range', keep_ratio=True),
+    dict(type='Resize', img_scale=(1333, 800), keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
@@ -130,7 +142,7 @@ test_pipeline = [
     dict(type='DOTALoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=[(1333, 800), (1333, 448)],
+        img_scale=(1333, 800),
         flip=False,
         transforms=[
             dict(type='Resize', keep_ratio=True),
@@ -142,23 +154,25 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    imgs_per_gpu=4,
-    workers_per_gpu=4,
+    imgs_per_gpu=2,
+    workers_per_gpu=2,
     train=dict(
         type=dataset_type,
-        ann_file='../data/train_crop800x800_dota_x1y1wh_polygen.json',
+        ann_file='../data/dota/train_dota+crop800x800.json',
         img_prefix=data_root + 'train/images/',
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
-        ann_file='../data/val_crop800x800_dota_x1y1wh_polygen.json',
+        ann_file='../data/dota/val_dota+crop800x800.json',
         img_prefix=data_root + 'val/images/',
-        pipeline=test_pipeline),
+        pipeline=test_pipeline,
+        mode='val'),
     test=dict(
         type=dataset_type,
-        ann_file='../data/test_crop800x800_original_dota.json',
+        ann_file='../data/dota/debug_test_dota+crop800x800.json',
         img_prefix=data_root + 'test/images/',
-        pipeline=test_pipeline))
+        pipeline=test_pipeline,
+        mode='test'))
 # optimizer
 optimizer = dict(type='SGD', lr=0.02, momentum=0.9, weight_decay=0.0001)
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
@@ -168,7 +182,7 @@ lr_config = dict(
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1.0 / 3,
-    step=[8, 11])
+    step=[20, 23])
 checkpoint_config = dict(interval=1)
 # yapf:disable
 log_config = dict(
@@ -178,12 +192,11 @@ log_config = dict(
         # dict(type='TensorboardLoggerHook')
     ])
 # yapf:enable
-evaluation = dict(interval=1)
 # runtime settings
-total_epochs = 6
+total_epochs = 24
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/mask_rcnn_r50_fpn_0.5x/dota/'
+work_dir = './work_dirs/mask_rcnn_r50_fpn_gn_ws_20_23_24e/dota'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]

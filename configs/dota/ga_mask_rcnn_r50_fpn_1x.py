@@ -15,17 +15,29 @@ model = dict(
         out_channels=256,
         num_outs=5),
     rpn_head=dict(
-        type='RPNHead',
+        type='GARPNHead',
         in_channels=256,
         feat_channels=256,
-        anchor_scales=[8],
-        anchor_ratios=[0.5, 1.0, 2.0],
+        octave_base_scale=8,
+        scales_per_octave=3,
+        octave_ratios=[0.5, 1.0, 2.0],
         anchor_strides=[4, 8, 16, 32, 64],
-        target_means=[.0, .0, .0, .0],
-        target_stds=[1.0, 1.0, 1.0, 1.0],
+        anchor_base_sizes=None,
+        anchoring_means=[.0, .0, .0, .0],
+        anchoring_stds=[0.07, 0.07, 0.14, 0.14],
+        target_means=(.0, .0, .0, .0),
+        target_stds=[0.07, 0.07, 0.11, 0.11],
+        loc_filter_thr=0.01,
+        loss_loc=dict(
+            type='FocalLoss',
+            use_sigmoid=True,
+            gamma=2.0,
+            alpha=0.25,
+            loss_weight=1.0),
+        loss_shape=dict(type='BoundedIoULoss', beta=0.2, loss_weight=1.0),
         loss_cls=dict(
             type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
-        loss_bbox=dict(type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0)),
+        loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0)),
     bbox_roi_extractor=dict(
         type='SingleRoIExtractor',
         roi_layer=dict(type='RoIAlign', out_size=7, sample_num=2),
@@ -60,6 +72,18 @@ model = dict(
 # model training and testing settings
 train_cfg = dict(
     rpn=dict(
+        ga_assigner=dict(
+            type='ApproxMaxIoUAssigner',
+            pos_iou_thr=0.7,
+            neg_iou_thr=0.3,
+            min_pos_iou=0.3,
+            ignore_iof_thr=-1),
+        ga_sampler=dict(
+            type='RandomSampler',
+            num=256,
+            pos_fraction=0.5,
+            neg_pos_ub=-1,
+            add_gt_as_proposals=False),
         assigner=dict(
             type='MaxIoUAssigner',
             pos_iou_thr=0.7,
@@ -72,22 +96,24 @@ train_cfg = dict(
             pos_fraction=0.5,
             neg_pos_ub=-1,
             add_gt_as_proposals=False),
-        allowed_border=0,
+        allowed_border=-1,
         pos_weight=-1,
+        center_ratio=0.2,
+        ignore_ratio=0.5,
         debug=False),
     rpn_proposal=dict(
         nms_across_levels=False,
         nms_pre=2000,
         nms_post=2000,
-        max_num=2000,
+        max_num=1000,    # changed!
         nms_thr=0.7,
         min_bbox_size=0),
     rcnn=dict(
         assigner=dict(
             type='MaxIoUAssigner',
-            pos_iou_thr=0.5,
-            neg_iou_thr=0.5,
-            min_pos_iou=0.5,
+            pos_iou_thr=0.6,    # changed, more important!
+            neg_iou_thr=0.6,
+            min_pos_iou=0.6,
             ignore_iof_thr=-1),
         sampler=dict(
             type='RandomSampler',
@@ -109,8 +135,9 @@ test_cfg = dict(
     rcnn=dict(
         score_thr=0.05,
         nms=dict(type='nms', iou_thr=0.5),
-        max_per_img=100,
+        max_per_img=500,
         mask_thr_binary=0.5))
+# dataset settings
 # dataset settings
 dataset_type = 'DOTADataset'
 data_root = '/media/gfjiang/865C6A1F5C6A09EF/data/DOTA/'
@@ -142,23 +169,25 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    imgs_per_gpu=4,
-    workers_per_gpu=4,
+    imgs_per_gpu=2,
+    workers_per_gpu=2,
     train=dict(
         type=dataset_type,
-        ann_file='../data/train_crop800x800_dota_x1y1wh_polygen.json',
+        ann_file='../data/dota/train_dota+crop800x800.json',
         img_prefix=data_root + 'train/images/',
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
-        ann_file='../data/val_crop800x800_dota_x1y1wh_polygen.json',
+        ann_file='../data/dota/val_dota+crop800x800.json',
         img_prefix=data_root + 'val/images/',
-        pipeline=test_pipeline),
+        pipeline=test_pipeline,
+        mode='val'),
     test=dict(
         type=dataset_type,
-        ann_file='../data/test_crop800x800_original_dota.json',
+        ann_file='../data/dota/debug_test_dota+crop800x800.json',
         img_prefix=data_root + 'test/images/',
-        pipeline=test_pipeline))
+        pipeline=test_pipeline,
+        mode='test'))
 # optimizer
 optimizer = dict(type='SGD', lr=0.02, momentum=0.9, weight_decay=0.0001)
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
@@ -180,10 +209,10 @@ log_config = dict(
 # yapf:enable
 evaluation = dict(interval=1)
 # runtime settings
-total_epochs = 6
+total_epochs = 12
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/mask_rcnn_r50_fpn_0.5x/dota/'
+work_dir = './work_dirs/ga_mask_rcnn_r50_fpn_1x/dota/'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]

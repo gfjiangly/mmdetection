@@ -300,7 +300,7 @@ class Normalize(object):
 
 @PIPELINES.register_module
 class RandomCrop(object):
-    """Random crop the image & bboxes.
+    """Random crop the image & bboxes & masks.
 
     Args:
         crop_size (tuple): Expected size after cropping, (h, w).

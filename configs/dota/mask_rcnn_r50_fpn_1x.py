@@ -146,19 +146,21 @@ data = dict(
     workers_per_gpu=4,
     train=dict(
         type=dataset_type,
-        ann_file='../data/train_crop800x800_dota_x1y1wh_polygen.json',
+        ann_file='../data/train_dota+crop800x800.json',
         img_prefix=data_root + 'train/images/',
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
-        ann_file='../data/val_crop800x800_dota_x1y1wh_polygen.json',
+        ann_file='../data/dota/val_dota+crop800x800.json',
         img_prefix=data_root + 'val/images/',
-        pipeline=test_pipeline),
+        pipeline=test_pipeline,
+        mode='val'),
     test=dict(
         type=dataset_type,
-        ann_file='../data/test_crop800x800_original_dota.json',
+        ann_file='../data/dota/debug_test_dota+crop800x800.json',
         img_prefix=data_root + 'test/images/',
-        pipeline=test_pipeline))
+        pipeline=test_pipeline,
+        mode='test'))
 # optimizer
 optimizer = dict(type='SGD', lr=0.02, momentum=0.9, weight_decay=0.0001)
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
@@ -168,7 +170,7 @@ lr_config = dict(
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1.0 / 3,
-    step=[8, 11])
+    step=[6, 9])
 checkpoint_config = dict(interval=1)
 # yapf:disable
 log_config = dict(
@@ -180,10 +182,10 @@ log_config = dict(
 # yapf:enable
 evaluation = dict(interval=1)
 # runtime settings
-total_epochs = 6
+total_epochs = 10
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/mask_rcnn_r50_fpn_0.5x/dota/'
+work_dir = './work_dirs/mask_rcnn_r50_fpn_2x/dota/'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]
