@@ -10,7 +10,7 @@ from imagecorruptions import corrupt
 from numpy import random
 
 from ..registry import PIPELINES
-from .transforms import RandomCrop, Expand
+from .transforms import RandomCrop, Expand, PhotoMetricDistortion
 
 
 @PIPELINES.register_module
@@ -63,11 +63,10 @@ class DOTARandomCrop(RandomCrop):
             # filter and crop the masks
             if 'gt_masks' in results:
                 valid_gt_masks = []
-                for i, is_valid in enumerate(valid_inds):
-                    if is_valid:
-                        gt_mask = results['gt_masks'][i]
-                        valid_gt_masks.append(
-                            gt_mask[crop_y1:crop_y2, crop_x1:crop_x2])
+                for i in np.where(valid_inds)[0]:
+                    gt_mask = results['gt_masks'][i][crop_y1:crop_y2, crop_x1:
+                                                     crop_x2]
+                    valid_gt_masks.append(gt_mask)
                 results['gt_masks'] = valid_gt_masks
 
         return results
@@ -117,4 +116,81 @@ class DOTAExpand(Expand):
         return results
 
 
+@PIPELINES.register_module
+class DOTAPhotoMetricDistortion(PhotoMetricDistortion):
+    """Apply photometric distortion to image sequentially, every transformation
+    is applied with a probability of 0.5. The position of random contrast is in
+    second or second to last.
+
+    1. random brightness
+    2. random contrast (mode 0)
+    3. convert color from BGR to HSV
+    4. random saturation
+    5. random hue
+    6. convert color from HSV to BGR
+    7. random contrast (mode 1)
+    8. randomly swap channels
+
+    Args:
+        brightness_delta (int): delta of brightness.
+        contrast_range (tuple): range of contrast.
+        saturation_range (tuple): range of saturation.
+        hue_delta (int): delta of hue.
+    """
+
+    def __call__(self, results):
+        img = results['img']
+        # random brightness
+        if random.randint(2):
+            delta = random.uniform(-self.brightness_delta,
+                                   self.brightness_delta)
+            # img = img + delta
+            np.add(img, delta, out=img, casting='unsafe')
+
+        # mode == 0 --> do random contrast first
+        # mode == 1 --> do random contrast last
+        mode = random.randint(2)
+        if mode == 1:
+            if random.randint(2):
+                alpha = random.uniform(self.contrast_lower,
+                                       self.contrast_upper)
+                # img = img * alpha
+                np.multiply(img, alpha, out=img, casting='unsafe')
+
+        # convert color from BGR to HSV
+        img = mmcv.bgr2hsv(img)
+
+        # random saturation
+        if random.randint(2):
+            # img[..., 1] *= random.uniform(self.saturation_lower,
+            #                               self.saturation_upper)
+            alpha = random.uniform(self.saturation_lower,
+                                   self.saturation_upper)
+            np.multiply(img[..., 1], alpha, out=img[..., 1], casting='unsafe')
+
+        # random hue
+        if random.randint(2):
+            delta = random.uniform(-self.hue_delta, self.hue_delta)
+            # img[..., 0] += random.uniform(-self.hue_delta, self.hue_delta)
+            np.add(img[..., 0], delta, out=img[..., 0], casting='unsafe')
+            img[..., 0][img[..., 0] > 360] -= 360
+            img[..., 0][img[..., 0] < 0] += 360
+
+        # convert color from HSV to BGR
+        img = mmcv.hsv2bgr(img)
+
+        # random contrast
+        if mode == 0:
+            if random.randint(2):
+                alpha = random.uniform(self.contrast_lower,
+                                       self.contrast_upper)
+                # img *= alpha
+                np.multiply(img, alpha, out=img, casting='unsafe')
+
+        # randomly swap channels
+        if random.randint(2):
+            img = img[..., random.permutation(3)]
+
+        results['img'] = img
+        return results
 

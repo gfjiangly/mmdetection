@@ -2,6 +2,7 @@
 model = dict(
     type='MaskRCNN',
     pretrained='torchvision://resnet50',
+    # pretrained='./work_dirs/mask_rcnn_r50_fpn_2x/dota/epoch_6.pth',
     backbone=dict(
         type='ResNet',
         depth=50,
@@ -119,8 +120,9 @@ img_norm_cfg = dict(
 train_pipeline = [
     dict(type='DOTALoadImageFromFile'),
     dict(type='DOTALoadAnnotations', with_bbox=True, with_mask=True),
-    dict(type='DOTARandomCrop', crop_size=(600, 600)),
-    dict(type='DOTAExpand', ratio_range=(1, 4)),
+    dict(type='DOTARandomCrop', crop_size=(400, 400)),
+    dict(type='DOTAPhotoMetricDistortion'),
+    dict(type='DOTAExpand', ratio_range=(1, 3)),
     dict(type='Resize', img_scale=(1333, 800), keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='Normalize', **img_norm_cfg),
