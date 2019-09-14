@@ -10,11 +10,12 @@ from .voc import VOCDataset
 from .wider_face import WIDERFaceDataset
 from .xml_style import XMLDataset
 from .dota import DOTADataset, DOTALoadImageFromFile, DOTALoadAnnotations
+from .hat import HatDataset
 
 __all__ = [
     'CustomDataset', 'XMLDataset', 'CocoDataset', 'VOCDataset',
     'CityscapesDataset', 'GroupSampler', 'DistributedGroupSampler',
     'build_dataloader', 'ConcatDataset', 'RepeatDataset', 'ExtraAugmentation',
     'WIDERFaceDataset', 'DATASETS', 'build_dataset',
-    'DOTADataset', 'DOTALoadImageFromFile', 'DOTALoadAnnotations'
+    'DOTADataset', 'DOTALoadImageFromFile', 'DOTALoadAnnotations', 'HatDataset'
 ]
