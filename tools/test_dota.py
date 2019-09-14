@@ -154,7 +154,7 @@ def evaluate_results_file(args):
 def generete_dota_test_results(args):
     cfg = mmcv.Config.fromfile(args.config)
     ann_file = cfg.data.test.ann_file
-    imgResults = merge_results(ann_file, args.results, n_worker=8)
+    imgResults = merge_results(ann_file, args.results, n_worker=4)
     catResults = ImgResults2CatResults(imgResults)
     from mmdet.datasets.dota import DOTADataset
     class_names = DOTADataset.CLASSES

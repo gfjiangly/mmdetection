@@ -15,19 +15,182 @@ from mmdet.core import coco_eval, results2json, wrap_fp16_model
 from mmdet.datasets import build_dataloader, build_dataset
 from mmdet.models import build_detector
 
+import numpy as np
+import pycocotools.mask as maskUtils
 
-def single_gpu_test(model, data_loader, show=False):
+from mmdet.core import get_classes, tensor2imgs
+import cv2
+import cvtools
+
+from mmcv.image import imread, imwrite
+from mmcv.visualization.color import color_val
+
+
+def imshow(img, win_name='', wait_time=0):
+    """Show an image.
+
+    Args:
+        img (str or ndarray): The image to be displayed.
+        win_name (str): The window name.
+        wait_time (int): Value of waitKey param.
+    """
+    cv2.imshow(win_name, imread(img))
+    cv2.waitKey(wait_time)
+
+
+def imshow_det_bboxes(img,
+                      bboxes,
+                      labels,
+                      class_names=None,
+                      score_thr=0,
+                      bbox_color='green',
+                      text_color='green',
+                      thickness=1,
+                      font_scale=0.5,
+                      show=True,
+                      win_name='',
+                      wait_time=0,
+                      out_file=None):
+    """Draw bboxes and class labels (with scores) on an image.
+
+    Args:
+        img (str or ndarray): The image to be displayed.
+        bboxes (ndarray): Bounding boxes (with scores), shaped (n, 4) or
+            (n, 5).
+        labels (ndarray): Labels of bboxes.
+        class_names (list[str]): Names of each classes.
+        score_thr (float): Minimum score of bboxes to be shown.
+        bbox_color (str or tuple or :obj:`Color`): Color of bbox lines.
+        text_color (str or tuple or :obj:`Color`): Color of texts.
+        thickness (int): Thickness of lines.
+        font_scale (float): Font scales of texts.
+        show (bool): Whether to show the image.
+        win_name (str): The window name.
+        wait_time (int): Value of waitKey param.
+        out_file (str or None): The filename to write the image.
+    """
+    assert bboxes.ndim == 2
+    assert labels.ndim == 1
+    assert bboxes.shape[0] == labels.shape[0]
+    assert bboxes.shape[1] == 4 or bboxes.shape[1] == 5
+    img = imread(img)
+
+    if score_thr > 0:
+        assert bboxes.shape[1] == 5
+        scores = bboxes[:, -1]
+        inds = scores > score_thr
+        bboxes = bboxes[inds, :]
+        labels = labels[inds]
+
+    bbox_color = color_val(bbox_color)
+    text_color = color_val(text_color)
+
+    for bbox, label in zip(bboxes, labels):
+        bbox_int = bbox.astype(np.int32)
+        left_top = (bbox_int[0], bbox_int[1])
+        right_bottom = (bbox_int[2], bbox_int[3])
+        cv2.rectangle(
+            img, left_top, right_bottom, bbox_color, thickness=thickness)
+        # label_text = class_names[
+        #     label] if class_names is not None else 'cls {}'.format(label)
+        # if len(bbox) > 4:
+        #     label_text += '|{:.02f}'.format(bbox[-1])
+        # cv2.putText(img, label_text, (bbox_int[0], bbox_int[1] - 2),
+        #             cv2.FONT_HERSHEY_COMPLEX, font_scale, text_color)
+
+    if show:
+        imshow(img, win_name, wait_time)
+    if out_file is not None:
+        imwrite(img, out_file)
+
+
+def save_image_results(data, result, dataset=None, score_thr=0.3,
+                       show=False, out_file=None):
+    if isinstance(result, tuple):
+        bbox_result, segm_result = result
+    else:
+        bbox_result, segm_result = result, None
+
+    img_tensor = data['img'][0]
+    img_metas = data['img_meta'][0].data[0]
+    imgs = tensor2imgs(img_tensor, **img_metas[0]['img_norm_cfg'])
+    assert len(imgs) == len(img_metas)
+
+    if isinstance(dataset, str):
+        class_names = get_classes(dataset)
+    elif isinstance(dataset, (list, tuple)):
+        class_names = dataset
+    else:
+        raise TypeError(
+            'dataset must be a valid dataset name or a sequence'
+            ' of class names, not {}'.format(type(dataset)))
+
+    rbboxes = []
+
+    for img, img_meta in zip(imgs, img_metas):
+        h, w, _ = img_meta['img_shape']
+        img_show = img[:h, :w, :]
+
+        bboxes = np.vstack(bbox_result)
+        # draw segmentation masks
+        if segm_result is not None:
+            segms = mmcv.concat_list(segm_result)
+            inds = np.where(bboxes[:, -1] > score_thr)[0]
+            for i in inds:
+                color_mask = np.random.randint(
+                    0, 256, (1, 3), dtype=np.uint8)
+                mask = maskUtils.decode(segms[i]).astype(np.bool)
+                # img_show[mask] = img_show[mask] * 0.5 + color_mask * 0.5
+
+                yx_mask = np.where(mask)
+                mask_coors = np.vstack((yx_mask[1], yx_mask[0])).transpose()
+                rbbox = cv2.minAreaRect(mask_coors)
+                rect = cvtools.xywh_to_x1y1x2y2([rbbox[0][0], rbbox[0][1], rbbox[1][0], rbbox[1][1]])
+                x1y1x2y2x3y3x4y4 = cvtools.rotate_rect(rect, rbbox[0], rbbox[2])
+                rbboxes.append(x1y1x2y2x3y3x4y4)
+
+        # draw bounding boxes
+        labels = [
+            np.full(bbox.shape[0], i, dtype=np.int32)
+            for i, bbox in enumerate(bbox_result)
+        ]
+        labels = np.concatenate(labels)
+
+        if out_file and len(rbboxes) > 0:
+            texts = [class_names[label] for label in labels]
+            img_show = cvtools.draw_boxes_texts(img_show, rbboxes,
+                                                # texts,
+                                                box_format='x1y1x2y2x3y3x4y4')
+            mmcv.imwrite(img_show, out_file)
+
+        # imshow_det_bboxes(
+        #     img_show,
+        #     bboxes,
+        #     labels,
+        #     # class_names=class_names,
+        #     score_thr=score_thr,
+        #     show=show,
+        #     out_file=out_file)
+
+
+def single_gpu_test(model, data_loader, show=False, out_image=None):
     model.eval()
     results = []
     dataset = data_loader.dataset
     prog_bar = mmcv.ProgressBar(len(dataset))
     for i, data in enumerate(data_loader):
         with torch.no_grad():
-            result = model(return_loss=False, rescale=not show, **data)
+            result = model(return_loss=False, rescale=not show and not out_image, **data)
         results.append(result)
 
-        if show:
-            model.module.show_result(data, result)
+        # if show:
+        #     model.module.show_result(data, result)
+        out_file = None
+        if out_image:
+            out_file = osp.join(
+                out_image, osp.basename(data['img_meta'][0].data[0][0]['filename'])
+            )
+        save_image_results(data, result, dataset.CLASSES, show=show, out_file=out_file)
 
         batch_size = data['img'][0].size(0)
         for _ in range(batch_size):
@@ -116,6 +279,11 @@ def parse_args():
         choices=['proposal', 'proposal_fast', 'bbox', 'segm', 'keypoints'],
         help='eval types')
     parser.add_argument('--show', action='store_true', help='show results')
+    parser.add_argument(
+        '--out_image',
+        type=str,
+        default=None,
+        help='save image results path')
     parser.add_argument('--tmpdir', help='tmp dir for writing some results')
     parser.add_argument(
         '--launcher',
@@ -187,7 +355,7 @@ def main():
 
     if not distributed:
         model = MMDataParallel(model, device_ids=[0])
-        outputs = single_gpu_test(model, data_loader, args.show)
+        outputs = single_gpu_test(model, data_loader, args.show, out_image=args.out_image)
     else:
         model = MMDistributedDataParallel(model.cuda())
         outputs = multi_gpu_test(model, data_loader, args.tmpdir)

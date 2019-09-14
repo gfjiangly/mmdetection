@@ -37,7 +37,7 @@ model = dict(
         in_channels=256,
         fc_out_channels=1024,
         roi_feat_size=7,
-        num_classes=15+1,
+        num_classes=1+1,
         target_means=[0., 0., 0., 0.],
         target_stds=[0.1, 0.1, 0.2, 0.2],
         reg_class_agnostic=False,
@@ -54,7 +54,7 @@ model = dict(
         num_convs=4,
         in_channels=256,
         conv_out_channels=256,
-        num_classes=15+1,
+        num_classes=1+1,
         loss_mask=dict(
             type='CrossEntropyLoss', use_mask=True, loss_weight=1.0)))
 # model training and testing settings
@@ -107,7 +107,7 @@ test_cfg = dict(
         nms_thr=0.7,
         min_bbox_size=0),
     rcnn=dict(
-        score_thr=0.05,
+        score_thr=0.1,
         nms=dict(type='nms', iou_thr=0.5),
         max_per_img=100,
         mask_thr_binary=0.5))
@@ -146,18 +146,18 @@ data = dict(
     workers_per_gpu=4,
     train=dict(
         type=dataset_type,
-        ann_file='../data/train_dota+crop800x800.json',
+        ann_file='../data/dota/train_dota_small-vehicle+crop800x800.json',
         img_prefix=data_root + 'train/images/',
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
-        ann_file='../data/dota/val_dota+crop800x800.json',
+        ann_file='../data/dota/val_dota_small-vehicle+crop800x800.json',
         img_prefix=data_root + 'val/images/',
         pipeline=test_pipeline,
         mode='val'),
     test=dict(
         type=dataset_type,
-        ann_file='../data/dota/debug_test_dota+crop800x800.json',
+        ann_file='../data/dota/test_dota+crop800x800.json',
         img_prefix=data_root + 'test/images/',
         pipeline=test_pipeline,
         mode='test'))
@@ -185,7 +185,7 @@ evaluation = dict(interval=1)
 total_epochs = 10
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/mask_rcnn_r50_fpn_2x/dota/'
+work_dir = './work_dirs/mask_rcnn_r50_fpn_2x/dota/small-car'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]

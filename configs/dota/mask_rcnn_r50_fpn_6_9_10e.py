@@ -2,7 +2,6 @@
 model = dict(
     type='MaskRCNN',
     pretrained='torchvision://resnet50',
-    # pretrained='./work_dirs/mask_rcnn_r50_fpn_2x/dota/epoch_6.pth',
     backbone=dict(
         type='ResNet',
         depth=50,
@@ -120,7 +119,7 @@ img_norm_cfg = dict(
 train_pipeline = [
     dict(type='DOTALoadImageFromFile'),
     dict(type='DOTALoadAnnotations', with_bbox=True, with_mask=True),
-    dict(type='DOTARandomCrop', crop_size=(400, 400)),
+    dict(type='DOTARandomCrop', crop_size=(768, 768)),
     dict(type='DOTAPhotoMetricDistortion'),
     dict(type='DOTAExpand', ratio_range=(1, 3)),
     dict(type='Resize', img_scale=(1333, 800), keep_ratio=True),
@@ -161,7 +160,7 @@ data = dict(
         mode='val'),
     test=dict(
         type=dataset_type,
-        ann_file='../data/dota/debug_test_dota+crop800x800.json',
+        ann_file='../data/dota/test_dota+original+crop800x800.json',
         img_prefix=data_root + 'test/images/',
         pipeline=test_pipeline,
         mode='test'))
@@ -190,6 +189,6 @@ total_epochs = 10
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = './work_dirs/mask_rcnn_r50_fpn_6_9_10e/dota/'
-load_from = None
+load_from = './work_dirs/mask_rcnn_r50_fpn_2x/dota/epoch_6.pth'
 resume_from = None
 workflow = [('train', 1)]
