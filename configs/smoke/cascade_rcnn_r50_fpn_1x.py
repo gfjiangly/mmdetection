@@ -1,3 +1,4 @@
+# coding: utf-8
 # model settings
 model = dict(
     type='CascadeRCNN',
@@ -159,7 +160,7 @@ test_cfg = dict(
     keep_all_stages=False)
 # dataset settings
 dataset_type = 'SmokeDataset'
-data_root = '/media/gfjiang/�칫/data/'
+data_root = '/media/gfjiang/办公/data/'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 train_pipeline = [
@@ -192,13 +193,13 @@ data = dict(
     workers_per_gpu=4,
     train=dict(
         type=dataset_type,
-        ann_file=data_root + 'smoke_V1.0/json/train_smoke_V1.json',
-        img_prefix=data_root + 'smoke_V1.0',
+        ann_file=data_root + 'smoke/V1.0/json/trainval_smoke.json',
+        img_prefix=data_root + 'smoke/V1.0',
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
-        ann_file=data_root + 'smoke_V1.0/json/train_smoke_V1.json',
-        img_prefix=data_root + 'smoke_V1.0',
+        ann_file=data_root + 'smoke/V1.0/json/train_smoke.json',
+        img_prefix=data_root + 'smoke/V1.0',
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
