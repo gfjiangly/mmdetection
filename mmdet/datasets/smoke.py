@@ -5,9 +5,11 @@
 # @File    : smoke.py
 # @Software: PyCharm
 import mmcv
+import os.path as osp
+import numpy as np
 
 from .coco import CocoDataset
-from .registry import DATASETS
+from .registry import DATASETS, PIPELINES
 
 
 @DATASETS.register_module
@@ -33,3 +35,29 @@ class SmokeDataset(CocoDataset):
             return mmcv.load(ann_file)
         else:
             return super().load_annotations(ann_file)
+
+
+@PIPELINES.register_module
+class SmokeLoadImageFromFile(object):
+
+    def __init__(self, to_float32=False):
+        self.to_float32 = to_float32
+
+    def __call__(self, results):
+        filename = osp.join(results['img_prefix'],
+                            results['img_info']['filename'])
+        img = mmcv.imread(filename)
+        if img is None:
+            print('image {} is None'.format(filename))
+            return None
+        if self.to_float32:
+            img = img.astype(np.float32)
+        results['filename'] = filename
+        results['img'] = img
+        results['img_shape'] = img.shape
+        results['ori_shape'] = img.shape
+        return results
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(to_float32={})'.format(
+            self.to_float32)
