@@ -76,6 +76,11 @@ class CustomDataset(Dataset):
         if not self.test_mode:
             self._set_group_flag()
         # processing pipeline
+        # self.mixup = False
+        # for processor in pipeline:
+        #     if 'MixUp'in processor['type']:
+        #         self.mixup = True
+        #         break
         self.pipeline = Compose(pipeline)
 
     def __len__(self):
@@ -137,6 +142,8 @@ class CustomDataset(Dataset):
         results = dict(img_info=img_info, ann_info=ann_info)
         if self.proposals is not None:
             results['proposals'] = self.proposals[idx]
+        # if self.mixup:
+        #     results = [results, self._get_another(idx)]
         self.pre_pipeline(results)
         return self.pipeline(results)
 
@@ -147,3 +154,15 @@ class CustomDataset(Dataset):
             results['proposals'] = self.proposals[idx]
         self.pre_pipeline(results)
         return self.pipeline(results)
+
+    def _get_another(self, idx):
+        while True:
+            mix_idx = self._rand_another(idx)
+            if mix_idx != idx:
+                break
+        img_info = self.img_infos[mix_idx]
+        ann_info = self.get_ann_info(mix_idx)
+        results = dict(img_info=img_info, ann_info=ann_info)
+        if self.proposals is not None:
+            results['proposals'] = self.proposals[mix_idx]
+        return results

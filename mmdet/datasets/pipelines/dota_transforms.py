@@ -6,7 +6,6 @@
 # @Software: PyCharm
 import mmcv
 import numpy as np
-from imagecorruptions import corrupt
 from numpy import random
 
 from ..registry import PIPELINES
@@ -117,6 +116,26 @@ class DOTAExpand(Expand):
 
 
 @PIPELINES.register_module
+class RandomBrightness(object):
+    def __init__(self, delta=32):
+        assert delta >= 0.0
+        assert delta <= 255.0
+        self.delta = delta
+
+    def __call__(self, results):
+        img = results['img']
+        if random.randint(2):
+            delta = random.uniform(-self.delta, self.delta)
+            # image += delta
+            image = img.astype(np.int)
+            np.add(image, delta, out=image, casting='unsafe')
+            image = np.clip(image, 0, 255)
+            img = image.astype(np.uint8)
+            results['img'] = img
+        return results
+
+
+@PIPELINES.register_module
 class DOTAPhotoMetricDistortion(PhotoMetricDistortion):
     """Apply photometric distortion to image sequentially, every transformation
     is applied with a probability of 0.5. The position of random contrast is in
@@ -194,3 +213,12 @@ class DOTAPhotoMetricDistortion(PhotoMetricDistortion):
         results['img'] = img
         return results
 
+
+@PIPELINES.register_module
+class MixUp(object):
+
+    def __init__(self, another_data):
+        self.another_data = another_data
+
+    def __call__(self, *args, **kwargs):
+        pass

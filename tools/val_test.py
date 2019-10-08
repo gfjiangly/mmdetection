@@ -129,6 +129,122 @@ def parse_args():
     return args
 
 
+class ValTest(object):
+
+    def __init__(self,
+                 config,
+                 checkpoint,
+                 eval=None,
+                 show=False,
+                 tmpdir=None,
+                 out=None,
+                 json_out=None,
+                 launcher='none'):
+        self.config = config
+        self.checkpoint = checkpoint
+        self.eval = eval
+        self.show = show
+        self.tmpdir = tmpdir
+        self.out = out
+        self.json_out = json_out
+        self.launcher = launcher
+        assert self.out or self.show or self.json_out, \
+            ('Please specify at least one operation (save or show the results) '
+             'with the argument "--out" or "--show" or "--json_out"')
+
+        if self.out is not None and not self.out.endswith(('.pkl', '.pickle')):
+            raise ValueError('The output file must be a pkl file.')
+
+        if self.json_out is not None and self.json_out.endswith('.json'):
+            self.json_out = self.json_out[:-5]
+
+        self.cfg = mmcv.Config.fromfile(self.config)
+        # set cudnn_benchmark
+        if self.cfg.get('cudnn_benchmark', False):
+            torch.backends.cudnn.benchmark = True
+        self.cfg.model.pretrained = None
+        if self.eval:
+            self.cfg.data.val.test_mode = False
+            self.data_val_test_cfg = self.cfg.data.val
+        else:
+            self.cfg.data.test.test_mode = True
+            self.data_val_test_cfg = self.cfg.data.test
+        self.cfg.data.workers_per_gpu = 0
+
+        # init distributed env first, since logger depends on the dist info.
+        if self.launcher == 'none':
+            self.distributed = False
+        else:
+            self.distributed = True
+            init_dist(self.launcher, **self.cfg.dist_params)
+
+    def detect(self):
+        # build the dataloader
+        # TODO: support multiple images per gpu (only minor changes are needed)
+        dataset = build_dataset(self.data_val_test_cfg)
+        data_loader = build_dataloader(
+            dataset,
+            imgs_per_gpu=1,
+            workers_per_gpu=self.cfg.data.workers_per_gpu,
+            dist=self.distributed,
+            shuffle=False)
+
+        # build the model and load checkpoint
+        model = build_detector(self.cfg.model, train_cfg=None, test_cfg=self.cfg.test_cfg)
+        fp16_cfg = self.cfg.get('fp16', None)
+        if fp16_cfg is not None:
+            wrap_fp16_model(model)
+        checkpoint = load_checkpoint(model, self.checkpoint, map_location='cpu')
+        # old versions did not save class info in checkpoints, this walkaround is
+        # for backward compatibility
+        if 'CLASSES' in checkpoint['meta']:
+            model.CLASSES = checkpoint['meta']['CLASSES']
+        else:
+            model.CLASSES = dataset.CLASSES
+
+        if not self.distributed:
+            model = MMDataParallel(model, device_ids=[0])
+            outputs = single_gpu_test(model, data_loader, self.show)
+        else:
+            model = MMDistributedDataParallel(model.cuda())
+            outputs = multi_gpu_test(model, data_loader, self.tmpdir)
+
+        if self.out:
+            print('\nwriting results to {}'.format(self.out))
+            mmcv.dump(outputs, self.out)
+
+        rank, _ = get_dist_info()
+        if self.eval and rank == 0:
+            eval_types = self.eval
+            if eval_types:
+                print('Starting evaluate {}'.format(' and '.join(eval_types)))
+                if eval_types == ['proposal_fast']:
+                    result_file = self.out
+                    coco_eval(result_file, eval_types, dataset.coco)
+                else:
+                    if not isinstance(outputs[0], dict):
+                        result_files = results2json(dataset, outputs, self.out)
+                        coco_eval(result_files, eval_types, dataset.coco)
+                    else:
+                        for name in outputs[0]:
+                            print('\nEvaluating {}'.format(name))
+                            outputs_ = [out[name] for out in outputs]
+                            result_file = self.out + '.{}'.format(name)
+                            result_files = results2json(dataset, outputs_,
+                                                        result_file)
+                            coco_eval(result_files, eval_types, dataset.coco)
+
+        # Save predictions in the COCO json format
+        if self.json_out and rank == 0:
+            if not isinstance(outputs[0], dict):
+                results2json(dataset, outputs, self.json_out)
+            else:
+                for name in outputs[0]:
+                    outputs_ = [out[name] for out in outputs]
+                    result_file = self.json_out + '.{}'.format(name)
+                    results2json(dataset, outputs_, result_file)
+
+
 def main():
     args = parse_args()
 

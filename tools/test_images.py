@@ -1,8 +1,8 @@
 # -*- encoding:utf-8 -*-
-# @Time    : 2019/9/14 16:52
+# @Time    : 2019/9/18 12:09
 # @Author  : gfjiang
 # @Site    : 
-# @File    : test_hat.py
+# @File    : test_images.py
 # @Software: PyCharm
 import os.path as osp
 import mmcv
@@ -13,7 +13,7 @@ from mmdet.ops import nms
 from mmdet.apis import init_detector, inference_detector
 
 
-class HatDetection(object):
+class Detection(object):
 
     def __init__(self, config, pth):
         self.imgs = []
@@ -48,15 +48,13 @@ class HatDetection(object):
                save_root=''):
         result = inference_detector(self.model, img)
         result = self.nms(result)
-        if isinstance(det_thrs, float):
-            det_thrs = [det_thrs] * len(result)
+        if isinstance(det_thrs, str):
+            det_thrs = det_thrs * len(result)
         if vis:
             to_file = osp.join(save_root, osp.basename(img))
             self.vis(img, result, vis_thr=vis_thr, to_file=to_file)
-        result = [det[det[..., 4] > det_thr] for det, det_thr
+        result = [det[det[..., 4] >= det_thr] for det, det_thr
                   in zip(result, det_thrs)]
-        if len(result) == 0:
-            print('detect: image {} has no object.'.format(img))
         self.img_detected.append(img)
         self.results.append(result)
         return result
@@ -90,23 +88,4 @@ class HatDetection(object):
         cvtools.imwrite(img, to_file)
 
     def save_results(self, save):
-        str_results = ''
-        for i, img in enumerate(self.img_detected):
-            result = self.results[i]
-            img = osp.basename(img)
-            for cls_index, dets in enumerate(result):
-                cls = self.model.CLASSES[cls_index]
-                for box in dets:
-                    bbox_str = ','.join(map(str, map(int, box[:4])))
-                    str_results += ' '.join([img, cls, bbox_str]) + '\n'
-        with open(save, 'w') as f:
-            f.write(str_results)
-
-
-# if __name__ == '__main__':
-#     config_file = '../configs/hat/hatv2_cascade_rcnn_x101_32x4d_fpn_1x.py'
-#     pth_file = 'work_dirs/hatv2_cascade_rcnn_x101_32x4d_fpn_1x/trainval/epoch_12.pth'
-#     hat_det = HatDetection(config_file, pth_file)
-#     hat_det('/media/gfjiang/办公/data/hat_V2.0/test', det_thrs=[0.68, 0.79],
-#             vis=True, vis_thr=0.1, save_root='work_dirs/hat_vis')
-#     hat_det.save_results('work_dirs/hatv2_cascade_rcnn_x101_32x4d_fpn_1x/trainval/hatdetect_result.txt')
+        mmcv.dump(self.results, save)

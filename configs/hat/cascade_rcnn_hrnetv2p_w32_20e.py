@@ -1,21 +1,36 @@
-# -*- encoding:utf-8 -*-
 # model settings
 model = dict(
     type='CascadeRCNN',
     num_stages=3,
-    pretrained='torchvision://resnet50',
+    pretrained='open-mmlab://msra/hrnetv2_w32',
     backbone=dict(
-        type='ResNet',
-        depth=50,
-        num_stages=4,
-        out_indices=(0, 1, 2, 3),
-        frozen_stages=1,
-        style='pytorch'),
-    neck=dict(
-        type='FPN',
-        in_channels=[256, 512, 1024, 2048],
-        out_channels=256,
-        num_outs=5),
+        type='HRNet',
+        extra=dict(
+            stage1=dict(
+                num_modules=1,
+                num_branches=1,
+                block='BOTTLENECK',
+                num_blocks=(4, ),
+                num_channels=(64, )),
+            stage2=dict(
+                num_modules=1,
+                num_branches=2,
+                block='BASIC',
+                num_blocks=(4, 4),
+                num_channels=(32, 64)),
+            stage3=dict(
+                num_modules=4,
+                num_branches=3,
+                block='BASIC',
+                num_blocks=(4, 4, 4),
+                num_channels=(32, 64, 128)),
+            stage4=dict(
+                num_modules=3,
+                num_branches=4,
+                block='BASIC',
+                num_blocks=(4, 4, 4, 4),
+                num_channels=(32, 64, 128, 256)))),
+    neck=dict(type='HRFPN', in_channels=[32, 64, 128, 256], out_channels=256),
     rpn_head=dict(
         type='RPNHead',
         in_channels=256,
@@ -40,7 +55,7 @@ model = dict(
             in_channels=256,
             fc_out_channels=1024,
             roi_feat_size=7,
-            num_classes=2+1,
+            num_classes=81,
             target_means=[0., 0., 0., 0.],
             target_stds=[0.1, 0.1, 0.2, 0.2],
             reg_class_agnostic=True,
@@ -53,7 +68,7 @@ model = dict(
             in_channels=256,
             fc_out_channels=1024,
             roi_feat_size=7,
-            num_classes=2+1,
+            num_classes=81,
             target_means=[0., 0., 0., 0.],
             target_stds=[0.05, 0.05, 0.1, 0.1],
             reg_class_agnostic=True,
@@ -66,13 +81,13 @@ model = dict(
             in_channels=256,
             fc_out_channels=1024,
             roi_feat_size=7,
-            num_classes=2+1,
+            num_classes=81,
             target_means=[0., 0., 0., 0.],
             target_stds=[0.033, 0.033, 0.067, 0.067],
             reg_class_agnostic=True,
             loss_cls=dict(
                 type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
-            loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0))
+            loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0)),
     ])
 # model training and testing settings
 train_cfg = dict(
@@ -160,7 +175,7 @@ test_cfg = dict(
     keep_all_stages=False)
 # dataset settings
 dataset_type = 'HatDataset'
-data_root = '/media/gfjiang/办公/data/'
+data_root = '/media/gfjiang/�칫/data/SHWD/VOC2028/'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 train_pipeline = [
@@ -189,21 +204,22 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    imgs_per_gpu=2,
-    workers_per_gpu=2,
+    imgs_per_gpu=4,
+    workers_per_gpu=4,
     train=dict(
         type=dataset_type,
-        ann_file=data_root + 'hat_V1.0/json/train_hat_V1.json',
-        img_prefix=data_root + 'hat_V1.0',
+        ann_file=[data_root + 'hat_V1.0/json/train_hat_V1.json',
+                  data_root + 'SHWD/VOC2028/json/trainval_new_shwd.json'],
+        img_prefix=[data_root + 'hat_V1.0', data_root + 'SHWD/VOC2028'],
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
-        ann_file=data_root + 'hat_V1.0/json/train_hat_V1.json',
-        img_prefix=data_root + 'hat_V1.0',
+        ann_file=data_root + 'SHWD/VOC2028/json/test_shwd_reduced.json',
+        img_prefix=data_root + 'SHWD/VOC2028',
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
-        ann_file=data_root + 'SHWD/VOC2028/json/test_shwd.json',
+        ann_file=data_root + 'SHWD/VOC2028/json/test_shwd_reduced.json',
         img_prefix=data_root,
         pipeline=test_pipeline))
 # optimizer
@@ -215,7 +231,7 @@ lr_config = dict(
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1.0 / 3,
-    step=[8, 11])
+    step=[16, 19])
 checkpoint_config = dict(interval=1)
 # yapf:disable
 log_config = dict(
@@ -226,10 +242,10 @@ log_config = dict(
     ])
 # yapf:enable
 # runtime settings
-total_epochs = 12
+total_epochs = 20
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/hatv1_cascade_rcnn_r50_fpn_1x/hat_detect'
+work_dir = './work_dirs/cascade_rcnn_hrnetv2p_w32/hat'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]

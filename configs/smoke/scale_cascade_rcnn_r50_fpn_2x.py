@@ -87,7 +87,7 @@ train_cfg = dict(
             type='RandomSampler',
             num=256,
             pos_fraction=0.5,
-            neg_pos_ub=-1,  # according to the paper, 3 may be better.
+            neg_pos_ub=-1,
             add_gt_as_proposals=False),
         allowed_border=0,
         pos_weight=-1,
@@ -166,7 +166,8 @@ img_norm_cfg = dict(
 train_pipeline = [
     dict(type='SmokeLoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='Resize', img_scale=(1333, 800), keep_ratio=True),
+    dict(type='DOTAPhotoMetricDistortion'),
+    dict(type='Resize', img_scale=[(400, 1600), (1400, 1600)], keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
@@ -177,8 +178,8 @@ test_pipeline = [
     dict(type='SmokeLoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=(1333, 800),
-        flip=False,
+        img_scale=[(1333, 800), (1600, 960)],
+        flip=True,
         transforms=[
             dict(type='Resize', keep_ratio=True),
             dict(type='RandomFlip'),
@@ -189,8 +190,8 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    imgs_per_gpu=4,
-    workers_per_gpu=4,
+    imgs_per_gpu=2,
+    workers_per_gpu=2,
     train=dict(
         type=dataset_type,
         ann_file=data_root + 'smoke/V1.0/json/train_smoke.json',
@@ -215,7 +216,7 @@ lr_config = dict(
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1.0 / 3,
-    step=[8, 11])
+    step=[16, 22])
 checkpoint_config = dict(interval=1)
 # yapf:disable
 log_config = dict(
@@ -226,10 +227,10 @@ log_config = dict(
     ])
 # yapf:enable
 # runtime settings
-total_epochs = 12
+total_epochs = 24
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/cascade_rcnn_r50_fpn_1x/smoke'
+work_dir = './work_dirs/cascade_rcnn_r50_fpn_2x/scale_smoke_detection'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]

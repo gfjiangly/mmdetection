@@ -1,3 +1,4 @@
+# -*- encoding:utf-8 -*-
 # model settings
 model = dict(
     type='CascadeRCNN',
@@ -72,20 +73,7 @@ model = dict(
             loss_cls=dict(
                 type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
             loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0))
-    ],
-    mask_roi_extractor=dict(
-        type='SingleRoIExtractor',
-        roi_layer=dict(type='RoIAlign', out_size=14, sample_num=2),
-        out_channels=256,
-        featmap_strides=[4, 8, 16, 32]),
-    mask_head=dict(
-        type='FCNMaskHead',
-        num_convs=4,
-        in_channels=256,
-        conv_out_channels=256,
-        num_classes=2+1,
-        loss_mask=dict(
-            type='CrossEntropyLoss', use_mask=True, loss_weight=1.0)))
+    ])
 # model training and testing settings
 train_cfg = dict(
     rpn=dict(
@@ -125,7 +113,6 @@ train_cfg = dict(
                 pos_fraction=0.25,
                 neg_pos_ub=-1,
                 add_gt_as_proposals=True),
-            mask_size=28,
             pos_weight=-1,
             debug=False),
         dict(
@@ -141,7 +128,6 @@ train_cfg = dict(
                 pos_fraction=0.25,
                 neg_pos_ub=-1,
                 add_gt_as_proposals=True),
-            mask_size=28,
             pos_weight=-1,
             debug=False),
         dict(
@@ -157,7 +143,6 @@ train_cfg = dict(
                 pos_fraction=0.25,
                 neg_pos_ub=-1,
                 add_gt_as_proposals=True),
-            mask_size=28,
             pos_weight=-1,
             debug=False)
     ],
@@ -171,25 +156,22 @@ test_cfg = dict(
         nms_thr=0.7,
         min_bbox_size=0),
     rcnn=dict(
-        score_thr=0.05,
-        nms=dict(type='nms', iou_thr=0.5),
-        max_per_img=100,
-        mask_thr_binary=0.5),
+        score_thr=0.05, nms=dict(type='nms', iou_thr=0.5), max_per_img=100),
     keep_all_stages=False)
 # dataset settings
 dataset_type = 'HatDataset'
-data_root = '/media/gfjiang/�칫/data/SHWD/VOC2028/'
+data_root = '/media/gfjiang/办公/data/'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 train_pipeline = [
     dict(type='LoadImageFromFile'),
-    dict(type='LoadAnnotations', with_bbox=True, with_mask=True),
+    dict(type='LoadAnnotations', with_bbox=True),
     dict(type='Resize', img_scale=(1333, 800), keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
     dict(type='DefaultFormatBundle'),
-    dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels', 'gt_masks']),
+    dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels']),
 ]
 test_pipeline = [
     dict(type='LoadImageFromFile'),
@@ -207,22 +189,22 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    imgs_per_gpu=2,
-    workers_per_gpu=2,
+    imgs_per_gpu=4,
+    workers_per_gpu=4,
     train=dict(
         type=dataset_type,
-        ann_file=data_root + 'json/train_shwd.json',
-        img_prefix=data_root + 'JPEGImages/',
+        ann_file=data_root + 'hat_V1.0/json/train_hat_V1.json',
+        img_prefix=data_root + 'hat_V1.0',
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
-        ann_file=data_root + 'json/instances_val2017.json',
-        img_prefix=data_root + 'JPEGImages/',
+        ann_file=data_root + 'SHWD/VOC2028/json/test_shwd.json',
+        img_prefix=data_root + 'SHWD/VOC2028',
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
-        ann_file=data_root + 'json/instances_val2017.json',
-        img_prefix=data_root + 'JPEGImages/',
+        ann_file=data_root + 'SHWD/VOC2028/json/test_shwd.json',
+        img_prefix=data_root,
         pipeline=test_pipeline))
 # optimizer
 optimizer = dict(type='SGD', lr=0.02, momentum=0.9, weight_decay=0.0001)
@@ -247,7 +229,7 @@ log_config = dict(
 total_epochs = 12
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/cascade_mask_rcnn_r50_fpn_1x/hat_detect'
+work_dir = './work_dirs/cascade_rcnn_r50_fpn_1x/aug_hat_detect'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]

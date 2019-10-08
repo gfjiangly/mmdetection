@@ -21,6 +21,8 @@ class Compose(object):
 
     def __call__(self, data):
         for t in self.transforms:
+            # if isinstance(t, str):  # or change all other transforms
+            #     data = data[0]
             data = t(data)
             if data is None:
                 return None

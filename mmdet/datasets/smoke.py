@@ -7,9 +7,11 @@
 import mmcv
 import os.path as osp
 import numpy as np
+from PIL import Image
 
 from .coco import CocoDataset
 from .registry import DATASETS, PIPELINES
+from .pipelines.loading import LoadImageFromFile
 
 
 @DATASETS.register_module
@@ -38,18 +40,21 @@ class SmokeDataset(CocoDataset):
 
 
 @PIPELINES.register_module
-class SmokeLoadImageFromFile(object):
-
-    def __init__(self, to_float32=False):
-        self.to_float32 = to_float32
+class SmokeLoadImageFromFile(LoadImageFromFile):
 
     def __call__(self, results):
         filename = osp.join(results['img_prefix'],
                             results['img_info']['filename'])
         img = mmcv.imread(filename)
-        if img is None:
-            print('image {} is None'.format(filename))
-            return None
+        if img is None:     # opencv problem for same images
+            img = np.array(Image.open(filename))
+            if img is None:
+                print('image {} is None'.format(filename))
+                return None
+            if len(img.shape) == 2:
+                img = np.repeat(img[..., np.newaxis], 3, axis=2)
+            else:
+                img = img[..., ::-1]
         if self.to_float32:
             img = img.astype(np.float32)
         results['filename'] = filename
@@ -57,7 +62,3 @@ class SmokeLoadImageFromFile(object):
         results['img_shape'] = img.shape
         results['ori_shape'] = img.shape
         return results
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(to_float32={})'.format(
-            self.to_float32)
